@@ -39,7 +39,7 @@ class AuthenticationTest extends TestCase
             'password' => 'wrong-password',
         ]);
 
-        $this->assertGuest();
+        $this->assertGuest();   
     }
 
     public function test_users_can_logout(): void

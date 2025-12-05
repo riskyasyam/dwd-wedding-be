@@ -40,6 +40,13 @@ class User extends Authenticatable
     ];
 
     /**
+     * Append accessor attributes to JSON response.
+     *
+     * @var array
+     */
+    protected $appends = ['name'];
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -50,6 +57,16 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Get the user's full name.
+     *
+     * @return string
+     */
+    public function getNameAttribute()
+    {
+        return trim("{$this->first_name} {$this->last_name}");
     }
 
     /**

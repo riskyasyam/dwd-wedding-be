@@ -82,9 +82,14 @@ class EventController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show($id)
+    public function show($identifier)
     {
-        $event = Event::with('images')->findOrFail($id);
+        // Try to find by ID first, if not numeric then find by slug
+        if (is_numeric($identifier)) {
+            $event = Event::with('images')->findOrFail($identifier);
+        } else {
+            $event = Event::with('images')->where('slug', $identifier)->firstOrFail();
+        }
 
         return response()->json([
             'success' => true,

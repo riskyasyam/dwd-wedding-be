@@ -70,9 +70,14 @@ class VendorController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show($id)
+    public function show($identifier)
     {
-        $vendor = Vendor::with('images')->findOrFail($id);
+        // Try to find by ID first, if not numeric then find by slug
+        if (is_numeric($identifier)) {
+            $vendor = Vendor::with('images')->findOrFail($identifier);
+        } else {
+            $vendor = Vendor::with('images')->where('slug', $identifier)->firstOrFail();
+        }
 
         return response()->json([
             'success' => true,

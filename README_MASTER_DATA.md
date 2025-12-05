@@ -777,21 +777,61 @@ interface EventForm {
 
 ---
 
-### 4. **Galleries** (Galeri Foto)
-**Table:** `galleries`
-**Purpose:** Portfolio foto dekorasi yang sudah dikerjakan
+### 4. **Advertisements** (Foto-foto Iklan / Banner)
+**Table:** `advertisements`
+**Purpose:** Banner/iklan promosi yang ditampilkan di website (carousel/slider)
+
 **Fields:**
 - `id` - Primary key
-- `title` - Judul foto
-- `category` - Kategori galeri
-- `image_url` - URL gambar
-- `description` - Deskripsi foto
+- `title` - Judul iklan/banner
+- `image` - Path/URL gambar iklan
+- `description` - Deskripsi iklan (optional)
+- `link_url` - Link redirect ketika banner diklik (optional)
+- `order` - Urutan tampil (untuk sorting)
+- `is_active` - Status aktif/nonaktif
+- `start_date` - Tanggal mulai tampil (optional)
+- `end_date` - Tanggal berakhir tampil (optional)
 
 **API Endpoints:**
 ```bash
-# List galleries
-GET /api/admin/galleries?category=Wedding
+# List active advertisements (Customer - untuk carousel/slider)
+GET /api/customer/advertisements
 Authorization: Bearer {token}
+
+Response:
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "title": "Wedding Fair 2024",
+      "image": "/storage/advertisements/banner_1.jpg",
+      "description": "Join our biggest wedding fair in Bali",
+      "link_url": "https://dwdwedding.com/wedding-fair",
+      "order": 0,
+      "is_active": true,
+      "start_date": "2024-12-01",
+      "end_date": "2024-12-31"
+    },
+    {
+      "id": 2,
+      "title": "Grand Wedding Ceremony",
+      "image": "/storage/advertisements/banner_2.jpg",
+      "description": null,
+      "link_url": null,
+      "order": 1,
+      "is_active": true,
+      "start_date": null,
+      "end_date": null
+    }
+  ]
+}
+
+# === ADMIN ONLY ===
+
+# List all advertisements (Admin)
+GET /api/admin/advertisements?is_active=true&search=wedding
+Authorization: Bearer {admin_token}
 
 Response:
 {
@@ -801,47 +841,243 @@ Response:
     "data": [
       {
         "id": 1,
-        "title": "Modern Wedding Setup",
-        "category": "Wedding",
-        "image_url": "https://example.com/gallery1.jpg",
-        "description": "Modern decoration setup at Grand Ballroom"
+        "title": "Wedding Fair 2024",
+        "image": "/storage/advertisements/banner_1.jpg",
+        "description": "Join our biggest wedding fair in Bali",
+        "link_url": "https://dwdwedding.com/wedding-fair",
+        "order": 0,
+        "is_active": true,
+        "start_date": "2024-12-01",
+        "end_date": "2024-12-31",
+        "created_at": "2025-12-01T10:00:00Z",
+        "updated_at": "2025-12-01T10:00:00Z"
       }
     ],
-    "per_page": 20
+    "per_page": 20,
+    "total": 5
   }
 }
 
-# Create gallery item
-POST /api/admin/galleries
-Authorization: Bearer {token}
+# Create advertisement (Admin)
+POST /api/admin/advertisements
+Authorization: Bearer {admin_token}
+Content-Type: multipart/form-data
+
+FormData:
+- title: "Wedding Fair 2024"
+- image: file.jpg
+- description: "Join our biggest wedding fair in Bali"
+- link_url: "https://dwdwedding.com/wedding-fair"
+- order: 0
+- is_active: true
+- start_date: "2024-12-01"
+- end_date: "2024-12-31"
+
+Response:
+{
+  "success": true,
+  "message": "Advertisement created successfully",
+  "data": {
+    "id": 1,
+    "title": "Wedding Fair 2024",
+    "image": "/storage/advertisements/1733234567_abc123.jpg",
+    "description": "Join our biggest wedding fair in Bali",
+    "link_url": "https://dwdwedding.com/wedding-fair",
+    "order": 0,
+    "is_active": true,
+    "start_date": "2024-12-01",
+    "end_date": "2024-12-31",
+    "created_at": "2025-12-03T12:00:00Z",
+    "updated_at": "2025-12-03T12:00:00Z"
+  }
+}
+
+# Get single advertisement (Admin)
+GET /api/admin/advertisements/{id}
+Authorization: Bearer {admin_token}
+
+Response:
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "title": "Wedding Fair 2024",
+    "image": "/storage/advertisements/banner_1.jpg",
+    "description": "Join our biggest wedding fair in Bali",
+    "link_url": "https://dwdwedding.com/wedding-fair",
+    "order": 0,
+    "is_active": true,
+    "start_date": "2024-12-01",
+    "end_date": "2024-12-31"
+  }
+}
+
+# Update advertisement (Admin)
+PUT /api/admin/advertisements/{id}
+Authorization: Bearer {admin_token}
+Content-Type: multipart/form-data
+
+FormData:
+- title: "Updated Wedding Fair 2024"
+- image: new_file.jpg (optional - replace image)
+- description: "Updated description"
+- link_url: "https://dwdwedding.com/new-link"
+- order: 1
+- is_active: false
+- start_date: "2025-01-01"
+- end_date: "2025-01-31"
+
+Response:
+{
+  "success": true,
+  "message": "Advertisement updated successfully",
+  "data": {
+    "id": 1,
+    "title": "Updated Wedding Fair 2024",
+    "image": "/storage/advertisements/1733234890_def456.jpg",
+    ...
+  }
+}
+
+# Delete advertisement (Admin)
+DELETE /api/admin/advertisements/{id}
+Authorization: Bearer {admin_token}
+
+Response:
+{
+  "success": true,
+  "message": "Advertisement deleted successfully"
+}
+
+# Update order advertisements (Admin - untuk drag & drop sorting)
+POST /api/admin/advertisements/update-order
+Authorization: Bearer {admin_token}
 Content-Type: application/json
 
 {
-  "title": "Modern Wedding Setup",
-  "category": "Wedding",
-  "image_url": "https://example.com/gallery1.jpg",
-  "description": "Modern decoration setup"
+  "items": [
+    { "id": 1, "order": 0 },
+    { "id": 3, "order": 1 },
+    { "id": 2, "order": 2 }
+  ]
 }
 
-# Get single gallery
-GET /api/admin/galleries/{id}
-
-# Update gallery
-PUT /api/admin/galleries/{id}
-
-# Delete gallery
-DELETE /api/admin/galleries/{id}
+Response:
+{
+  "success": true,
+  "message": "Advertisement order updated successfully"
+}
 ```
 
-**Frontend Form Fields:**
+**Frontend Form Fields (Admin):**
 ```typescript
-interface GalleryForm {
-  title: string;        // Required, max 255
-  category: string;     // Required, max 255
-  image_url: string;    // Required, URL or file upload
-  description?: string; // Optional, textarea
+interface AdvertisementForm {
+  title: string;          // Required, max 255
+  image: File;            // Required on create, optional on update
+  description?: string;   // Optional, textarea
+  link_url?: string;      // Optional, URL format (https://...)
+  order?: number;         // Optional, default 0 (untuk sorting urutan tampil)
+  is_active?: boolean;    // Optional, default true (checkbox)
+  start_date?: string;    // Optional, date picker (tanggal mulai tampil)
+  end_date?: string;      // Optional, date picker (tanggal berakhir, must be >= start_date)
+}
+
+// Response advertisement
+interface Advertisement {
+  id: number;
+  title: string;
+  image: string;
+  description: string | null;
+  link_url: string | null;
+  order: number;
+  is_active: boolean;
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string;
+  updated_at: string;
 }
 ```
+
+**Frontend Usage (Customer - Homepage Carousel):**
+```typescript
+// 1. Fetch active advertisements
+const [advertisements, setAdvertisements] = useState<Advertisement[]>([]);
+
+useEffect(() => {
+  const loadAds = async () => {
+    const { data } = await axios.get('/api/customer/advertisements');
+    setAdvertisements(data.data);
+  };
+  loadAds();
+}, []);
+
+// 2. Display as carousel/slider
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Autoplay, Pagination } from 'swiper/modules';
+
+<Swiper
+  modules={[Autoplay, Pagination]}
+  autoplay={{ delay: 5000 }}
+  pagination={{ clickable: true }}
+  loop={true}
+>
+  {advertisements.map(ad => (
+    <SwiperSlide key={ad.id}>
+      {ad.link_url ? (
+        <a href={ad.link_url} target="_blank">
+          <img src={ad.image} alt={ad.title} />
+        </a>
+      ) : (
+        <img src={ad.image} alt={ad.title} />
+      )}
+      {ad.description && (
+        <div className="caption">
+          <h3>{ad.title}</h3>
+          <p>{ad.description}</p>
+        </div>
+      )}
+    </SwiperSlide>
+  ))}
+</Swiper>
+
+// 3. Admin - Drag & Drop Sorting
+import { DndContext, closestCenter } from '@dnd-kit/core';
+import { SortableContext, arrayMove } from '@dnd-kit/sortable';
+
+const handleDragEnd = async (event: any) => {
+  const { active, over } = event;
+  if (active.id !== over.id) {
+    const oldIndex = ads.findIndex(item => item.id === active.id);
+    const newIndex = ads.findIndex(item => item.id === over.id);
+    
+    const newAds = arrayMove(ads, oldIndex, newIndex);
+    setAds(newAds);
+    
+    // Update order in backend
+    await axios.post('/api/admin/advertisements/update-order', {
+      items: newAds.map((ad, index) => ({
+        id: ad.id,
+        order: index
+      }))
+    });
+  }
+};
+```
+
+**Use Cases:**
+1. **Homepage Banner:** Carousel slider di halaman utama
+2. **Promo Banner:** Iklan promo/diskon periode tertentu
+3. **Event Banner:** Banner untuk event/wedding fair
+4. **Partner Banner:** Banner sponsor/partner
+5. **Seasonal Campaign:** Banner khusus musim (Ramadan, Christmas, dll)
+
+**Fitur:**
+- Upload gambar iklan (landscape recommended: 1920x600px)
+- Optional link redirect ketika diklik
+- Schedule tampil by date range (start_date - end_date)
+- Enable/disable tanpa hapus (is_active)
+- Drag & drop sorting untuk urutan tampil
+- Auto-filter aktif di customer API (by is_active + date range)
 
 ---
 

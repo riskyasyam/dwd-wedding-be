@@ -81,9 +81,14 @@ class DecorationController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show($id)
+    public function show($identifier)
     {
-        $decoration = Decoration::with('images', 'freeItems')->findOrFail($id);
+        // Try to find by ID first, if not numeric then find by slug
+        if (is_numeric($identifier)) {
+            $decoration = Decoration::with('images', 'freeItems')->findOrFail($identifier);
+        } else {
+            $decoration = Decoration::with('images', 'freeItems')->where('slug', $identifier)->firstOrFail();
+        }
 
         return response()->json([
             'success' => true,
@@ -194,6 +199,22 @@ class DecorationController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Image deleted successfully'
+        ]);
+    }
+
+    /**
+     * Get decoration list for dropdown/select.
+     * Returns only id and name for form selects.
+     */
+    public function dropdown()
+    {
+        $decorations = Decoration::select('id', 'name', 'slug')
+            ->orderBy('name', 'asc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $decorations
         ]);
     }
 }

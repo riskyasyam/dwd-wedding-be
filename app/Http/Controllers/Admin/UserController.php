@@ -67,11 +67,12 @@ class UserController extends Controller
         $customer = User::where('role', 'customer')->findOrFail($id);
 
         $request->validate([
-            'name' => 'sometimes|required|string|max:255',
+            'first_name' => 'sometimes|required|string|max:255',
+            'last_name' => 'sometimes|required|string|max:255',
             'email' => 'sometimes|required|email|unique:users,email,' . $id,
         ]);
 
-        $customer->update($request->only(['name', 'email']));
+        $customer->update($request->only(['first_name', 'last_name', 'email']));
 
         return response()->json([
             'success' => true,
@@ -115,6 +116,23 @@ class UserController extends Controller
                 'unverified_customers' => $unverifiedCustomers,
                 'new_customers_this_month' => $newCustomersThisMonth,
             ]
+        ]);
+    }
+
+    /**
+     * Get customer list for dropdown/select.
+     * Returns only id and name for form selects.
+     */
+    public function dropdown()
+    {
+        $customers = User::select('id', 'first_name', 'last_name', 'email')
+            ->where('role', 'customer')
+            ->orderBy('first_name', 'asc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $customers
         ]);
     }
 }

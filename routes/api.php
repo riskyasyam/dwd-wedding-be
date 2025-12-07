@@ -95,6 +95,27 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('decorations/{decorationId}/free-items/{id}', [\App\Http\Controllers\Admin\DecorationFreeItemController::class, 'update']);
         Route::delete('decorations/{decorationId}/free-items/{id}', [\App\Http\Controllers\Admin\DecorationFreeItemController::class, 'destroy']);
         
+        // Decoration Advantages
+        Route::get('decorations/{decorationId}/advantages', [\App\Http\Controllers\Admin\DecorationAdvantageController::class, 'index']);
+        Route::post('decorations/{decorationId}/advantages', [\App\Http\Controllers\Admin\DecorationAdvantageController::class, 'store']);
+        Route::get('decorations/{decorationId}/advantages/{id}', [\App\Http\Controllers\Admin\DecorationAdvantageController::class, 'show']);
+        Route::put('decorations/{decorationId}/advantages/{id}', [\App\Http\Controllers\Admin\DecorationAdvantageController::class, 'update']);
+        Route::delete('decorations/{decorationId}/advantages/{id}', [\App\Http\Controllers\Admin\DecorationAdvantageController::class, 'destroy']);
+        
+        // Decoration Terms
+        Route::get('decorations/{decorationId}/terms', [\App\Http\Controllers\Admin\DecorationTermController::class, 'index']);
+        Route::post('decorations/{decorationId}/terms', [\App\Http\Controllers\Admin\DecorationTermController::class, 'store']);
+        Route::get('decorations/{decorationId}/terms/{id}', [\App\Http\Controllers\Admin\DecorationTermController::class, 'show']);
+        Route::put('decorations/{decorationId}/terms/{id}', [\App\Http\Controllers\Admin\DecorationTermController::class, 'update']);
+        Route::delete('decorations/{decorationId}/terms/{id}', [\App\Http\Controllers\Admin\DecorationTermController::class, 'destroy']);
+        
+        // Decoration FAQs
+        Route::get('decorations/{decorationId}/faqs', [\App\Http\Controllers\Admin\FaqController::class, 'index']);
+        Route::post('decorations/{decorationId}/faqs', [\App\Http\Controllers\Admin\FaqController::class, 'store']);
+        Route::get('decorations/{decorationId}/faqs/{id}', [\App\Http\Controllers\Admin\FaqController::class, 'show']);
+        Route::put('decorations/{decorationId}/faqs/{id}', [\App\Http\Controllers\Admin\FaqController::class, 'update']);
+        Route::delete('decorations/{decorationId}/faqs/{id}', [\App\Http\Controllers\Admin\FaqController::class, 'destroy']);
+        
         // Events
         Route::apiResource('events', \App\Http\Controllers\Admin\EventController::class);
         Route::post('events/{id}/images', [\App\Http\Controllers\Admin\EventController::class, 'uploadImages']);

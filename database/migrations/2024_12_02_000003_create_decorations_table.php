@@ -25,6 +25,8 @@ return new class extends Migration
             $table->decimal('rating', 2, 1)->default(0);
             $table->integer('review_count')->default(0);
             $table->boolean('is_deals')->default(false);
+            $table->json('advantages')->nullable();
+            $table->json('terms')->nullable();
             $table->timestamps();
         });
     }

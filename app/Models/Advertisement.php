@@ -24,6 +24,24 @@ class Advertisement extends Model
         'order' => 'integer',
     ];
 
+    protected $appends = ['image_url'];
+
+    /**
+     * Get full image URL.
+     */
+    public function getImageUrlAttribute()
+    {
+        if (!$this->image) {
+            return null;
+        }
+        
+        if (str_starts_with($this->image, 'http')) {
+            return $this->image;
+        }
+        
+        return config('app.url') . $this->image;
+    }
+
     /**
      * Check if advertisement is currently active and within date range.
      */

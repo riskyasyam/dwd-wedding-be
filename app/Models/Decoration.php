@@ -70,6 +70,30 @@ class Decoration extends Model
     }
 
     /**
+     * Get the advantages for the decoration.
+     */
+    public function advantages()
+    {
+        return $this->hasMany(DecorationAdvantage::class)->orderBy('order');
+    }
+
+    /**
+     * Get the terms for the decoration.
+     */
+    public function terms()
+    {
+        return $this->hasMany(DecorationTerm::class)->orderBy('order');
+    }
+
+    /**
+     * Get the FAQs for the decoration.
+     */
+    public function faqs()
+    {
+        return $this->hasMany(Faq::class)->orderBy('order');
+    }
+
+    /**
      * Get the reviews for the decoration.
      */
     public function reviews()

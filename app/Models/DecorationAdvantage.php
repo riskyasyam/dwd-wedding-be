@@ -4,12 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Faq extends Model
+class DecorationAdvantage extends Model
 {
     protected $fillable = [
         'decoration_id',
-        'question',
-        'answer',
+        'title',
+        'description',
         'order',
     ];
 
@@ -18,7 +18,7 @@ class Faq extends Model
     ];
 
     /**
-     * Get the decoration that owns the FAQ.
+     * Get the decoration that owns the advantage.
      */
     public function decoration()
     {

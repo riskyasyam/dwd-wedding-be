@@ -14,7 +14,7 @@ class DecorationController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Decoration::with('images', 'freeItems');
+        $query = Decoration::with('images', 'freeItems', 'advantages', 'terms', 'faqs');
 
         // Filter by region
         if ($request->has('region')) {
@@ -30,6 +30,8 @@ class DecorationController extends Controller
         if ($request->has('search')) {
             $query->where('name', 'like', '%' . $request->search . '%');
         }
+
+        
 
         $decorations = $query->orderBy('created_at', 'desc')->paginate(15);
 
@@ -53,6 +55,8 @@ class DecorationController extends Controller
             'discount_start_date' => 'nullable|date',
             'discount_end_date' => 'nullable|date|after_or_equal:discount_start_date',
             'is_deals' => 'boolean',
+            'advantages' => 'nullable|array',
+            'terms' => 'nullable|array',
         ]);
 
         $discountPercent = $request->discount_percent ?? 0;
@@ -85,9 +89,9 @@ class DecorationController extends Controller
     {
         // Try to find by ID first, if not numeric then find by slug
         if (is_numeric($identifier)) {
-            $decoration = Decoration::with('images', 'freeItems')->findOrFail($identifier);
+            $decoration = Decoration::with('images', 'freeItems', 'advantages', 'terms', 'faqs')->findOrFail($identifier);
         } else {
-            $decoration = Decoration::with('images', 'freeItems')->where('slug', $identifier)->firstOrFail();
+            $decoration = Decoration::with('images', 'freeItems', 'advantages', 'terms', 'faqs')->where('slug', $identifier)->firstOrFail();
         }
 
         return response()->json([

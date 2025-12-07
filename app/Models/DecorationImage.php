@@ -11,6 +11,26 @@ class DecorationImage extends Model
         'image',
     ];
 
+    protected $appends = ['image_url'];
+
+    /**
+     * Get full image URL.
+     */
+    public function getImageUrlAttribute()
+    {
+        if (!$this->image) {
+            return null;
+        }
+        
+        // If already full URL, return as is
+        if (str_starts_with($this->image, 'http')) {
+            return $this->image;
+        }
+        
+        // Prepend APP_URL for relative paths
+        return config('app.url') . $this->image;
+    }
+
     /**
      * Get the decoration that owns the image.
      */

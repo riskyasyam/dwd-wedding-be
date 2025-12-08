@@ -72,12 +72,27 @@ Route::middleware('auth:sanctum')->group(function () {
         
         // Vouchers - validate voucher code
         Route::post('/vouchers/validate', [\App\Http\Controllers\Admin\VoucherController::class, 'validate']);
+        Route::post('/checkout/validate-voucher', [\App\Http\Controllers\Admin\VoucherController::class, 'validate']); // Alias for cart/checkout context
         
         // Reviews - customer can create/edit own reviews
         Route::post('/reviews', [\App\Http\Controllers\Admin\ReviewController::class, 'storeCustomer']);
         Route::get('/reviews/can-review/{decorationId}', [\App\Http\Controllers\Admin\ReviewController::class, 'canReview']);
         Route::put('/reviews/{id}', [\App\Http\Controllers\Admin\ReviewController::class, 'updateOwn']);
         Route::delete('/reviews/{id}', [\App\Http\Controllers\Admin\ReviewController::class, 'destroyOwn']);
+        
+        // Cart Management
+        Route::get('/cart', [\App\Http\Controllers\Customer\CartController::class, 'index']);
+        Route::post('/cart/add', [\App\Http\Controllers\Customer\CartController::class, 'addItem']);
+        Route::put('/cart/items/{itemId}', [\App\Http\Controllers\Customer\CartController::class, 'updateItem']);
+        Route::delete('/cart/items/{itemId}', [\App\Http\Controllers\Customer\CartController::class, 'removeItem']);
+        Route::delete('/cart/clear', [\App\Http\Controllers\Customer\CartController::class, 'clear']);
+        
+        // Orders & Checkout
+        Route::get('/orders', [\App\Http\Controllers\Customer\OrderController::class, 'index']);
+        Route::get('/orders/{id}', [\App\Http\Controllers\Customer\OrderController::class, 'show']);
+        Route::post('/orders/checkout', [\App\Http\Controllers\Customer\OrderController::class, 'checkout']);
+        Route::get('/orders/payment-status/{orderNumber}', [\App\Http\Controllers\Customer\OrderController::class, 'checkPaymentStatus']);
+        Route::put('/orders/{id}/cancel', [\App\Http\Controllers\Customer\OrderController::class, 'cancel']);
     });
     
     // Admin routes - CRUD operations
@@ -153,5 +168,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('reviews/{id}', [\App\Http\Controllers\Admin\ReviewController::class, 'show']);
         Route::put('reviews/{id}', [\App\Http\Controllers\Admin\ReviewController::class, 'update']);
         Route::delete('reviews/{id}', [\App\Http\Controllers\Admin\ReviewController::class, 'destroy']);
+        
+        // Orders Management
+        Route::get('orders/statistics', [\App\Http\Controllers\Admin\OrderController::class, 'statistics']);
+        Route::get('orders/recent/{limit?}', [\App\Http\Controllers\Admin\OrderController::class, 'recent']);
+        Route::get('orders', [\App\Http\Controllers\Admin\OrderController::class, 'index']);
+        Route::get('orders/{id}', [\App\Http\Controllers\Admin\OrderController::class, 'show']);
+        Route::put('orders/{id}/status', [\App\Http\Controllers\Admin\OrderController::class, 'updateStatus']);
     });
 });

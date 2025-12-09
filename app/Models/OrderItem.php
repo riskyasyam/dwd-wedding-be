@@ -11,10 +11,14 @@ class OrderItem extends Model
         'decoration_id',
         'type',
         'quantity',
+        'base_price',
+        'discount',
         'price',
     ];
 
     protected $casts = [
+        'base_price' => 'integer',
+        'discount' => 'integer',
         'price' => 'integer',
     ];
 

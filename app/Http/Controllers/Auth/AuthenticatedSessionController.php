@@ -41,11 +41,17 @@ class AuthenticatedSessionController extends Controller
             }
 
             $user = Auth::user();
-            $token = $user->createToken('auth-token')->plainTextToken;
+            
+            // Create token with expiration
+            $expirationMinutes = config('sanctum.expiration', 10);
+            $token = $user->createToken('auth-token', ['*'], now()->addMinutes($expirationMinutes))->plainTextToken;
 
             return response()->json([
+                'success' => true,
                 'user' => $user,
-                'token' => $token
+                'token' => $token,
+                'expires_in' => $expirationMinutes * 60, // in seconds
+                'message' => "Token will expire in {$expirationMinutes} minutes"
             ]);
         }
 

@@ -15,7 +15,7 @@ class OrderController extends Controller
     {
         $query = Order::with(['user', 'items.decoration.images']);
 
-        // Filter by status
+        // Filter by status 
         if ($request->has('status')) {
             $query->where('status', $request->status);
         }
@@ -135,6 +135,77 @@ class OrderController extends Controller
         return response()->json([
             'success' => true,
             'data' => $orders
+        ]);
+    }
+
+    /**
+     * Get all orders from a specific user (admin view)
+     * Returns detailed order history for a specific user
+     */
+    public function getUserOrders(Request $request, $userId)
+    {
+        $query = Order::with(['user', 'items.decoration.images'])
+            ->where('user_id', $userId);
+
+        // Filter by status
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+
+        // Filter by date range
+        if ($request->has('start_date')) {
+            $query->whereDate('created_at', '>=', $request->start_date);
+        }
+
+        if ($request->has('end_date')) {
+            $query->whereDate('created_at', '<=', $request->end_date);
+        }
+
+        $orders = $query->orderBy('created_at', 'desc')->paginate(20);
+
+        // Transform orders to include detailed price breakdown
+        $orders->getCollection()->transform(function ($order) {
+            $itemsWithPriceBreakdown = $order->items->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'order_id' => $item->order_id,
+                    'decoration_id' => $item->decoration_id,
+                    'type' => $item->type,
+                    'quantity' => $item->quantity,
+                    'base_price' => $item->base_price, // Harga asli
+                    'discount' => $item->discount, // Diskon
+                    'price' => $item->price, // Harga setelah diskon (base_price - discount)
+                    'created_at' => $item->created_at,
+                    'updated_at' => $item->updated_at,
+                    'decoration' => $item->decoration,
+                ];
+            });
+
+            $order->items = $itemsWithPriceBreakdown;
+            return $order;
+        });
+
+        // Calculate user statistics
+        $totalOrders = Order::where('user_id', $userId)->count();
+        $totalSpent = Order::where('user_id', $userId)
+            ->whereIn('status', ['paid', 'completed'])
+            ->sum('total');
+        $pendingOrders = Order::where('user_id', $userId)
+            ->where('status', 'pending')
+            ->count();
+        $completedOrders = Order::where('user_id', $userId)
+            ->where('status', 'completed')
+            ->count();
+
+        return response()->json([
+            'success' => true,
+            'data' => $orders,
+            'statistics' => [
+                'total_orders' => $totalOrders,
+                'total_spent' => $totalSpent,
+                'pending_orders' => $pendingOrders,
+                'completed_orders' => $completedOrders,
+            ]
         ]);
     }
 }

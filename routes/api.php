@@ -24,7 +24,7 @@ Route::prefix('public')->group(function () {
     // Testimonials - public browsing
     Route::get('/testimonials', [\App\Http\Controllers\Admin\TestimonialController::class, 'index']);
     
-    // Inspirations - public browsing
+    // Inspirations - public browsing (no auth required)
     Route::get('/inspirations', [\App\Http\Controllers\Admin\InspirationController::class, 'index']);
     Route::get('/inspirations/{id}', [\App\Http\Controllers\Admin\InspirationController::class, 'show']);
     
@@ -64,15 +64,15 @@ Route::middleware('auth:sanctum')->group(function () {
         // Testimonials - public browsing
         Route::get('/testimonials', [\App\Http\Controllers\Admin\TestimonialController::class, 'index']);
         
-        // Inspirations - public browsing
-        Route::get('/inspirations', [\App\Http\Controllers\Admin\InspirationController::class, 'index']);
-        Route::get('/inspirations/{id}', [\App\Http\Controllers\Admin\InspirationController::class, 'show']);
+        // Inspirations - actions that require authentication
         Route::post('/inspirations/{id}/like', [\App\Http\Controllers\Admin\InspirationController::class, 'toggleLike']);
+        Route::delete('/inspirations/{id}/saved', [\App\Http\Controllers\Admin\InspirationController::class, 'removeSaved']);
         Route::get('/my-saved-inspirations', [\App\Http\Controllers\Admin\InspirationController::class, 'mySaved']);
         
         // Vouchers - validate voucher code
         Route::post('/vouchers/validate', [\App\Http\Controllers\Admin\VoucherController::class, 'validate']);
         Route::post('/checkout/validate-voucher', [\App\Http\Controllers\Admin\VoucherController::class, 'validate']); // Alias for cart/checkout context
+        Route::post('/orders/checkout/validate-voucher', [\App\Http\Controllers\Admin\VoucherController::class, 'validate']); // Alias for orders/checkout context
         
         // Reviews - customer can create/edit own reviews
         Route::post('/reviews', [\App\Http\Controllers\Admin\ReviewController::class, 'storeCustomer']);
@@ -93,10 +93,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/orders/checkout', [\App\Http\Controllers\Customer\OrderController::class, 'checkout']);
         Route::get('/orders/payment-status/{orderNumber}', [\App\Http\Controllers\Customer\OrderController::class, 'checkPaymentStatus']);
         Route::put('/orders/{id}/cancel', [\App\Http\Controllers\Customer\OrderController::class, 'cancel']);
+        Route::post('/orders/{id}/review', [\App\Http\Controllers\Customer\OrderController::class, 'submitReview']);
     });
     
     // Admin routes - CRUD operations
     Route::prefix('admin')->middleware('role:admin')->group(function () {
+        // Dashboard - Overview Statistics
+        Route::get('dashboard', [\App\Http\Controllers\Admin\DashboardController::class, 'index']);
+        
         // Decorations
         Route::get('decorations/dropdown', [\App\Http\Controllers\Admin\DecorationController::class, 'dropdown']);
         Route::apiResource('decorations', \App\Http\Controllers\Admin\DecorationController::class);
@@ -175,5 +179,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('orders', [\App\Http\Controllers\Admin\OrderController::class, 'index']);
         Route::get('orders/{id}', [\App\Http\Controllers\Admin\OrderController::class, 'show']);
         Route::put('orders/{id}/status', [\App\Http\Controllers\Admin\OrderController::class, 'updateStatus']);
+        Route::get('users/{userId}/orders', [\App\Http\Controllers\Admin\OrderController::class, 'getUserOrders']);
     });
 });

@@ -39,6 +39,17 @@ class InspirationController extends Controller
 
         $inspirations = $query->paginate(15);
 
+        // Add is_saved flag if user is authenticated
+        if (auth()->check()) {
+            $user = auth()->user();
+            $inspirations->getCollection()->transform(function ($inspiration) use ($user) {
+                $inspiration->is_saved = $inspiration->savedByUsers()
+                    ->where('user_id', $user->id)
+                    ->exists();
+                return $inspiration;
+            });
+        }
+
         return response()->json([
             'success' => true,
             'data' => $inspirations
@@ -84,6 +95,14 @@ class InspirationController extends Controller
     public function show($id)
     {
         $inspiration = Inspiration::findOrFail($id);
+        
+        // Add is_saved flag if user is authenticated
+        if (auth()->check()) {
+            $user = auth()->user();
+            $inspiration->is_saved = $inspiration->savedByUsers()
+                ->where('user_id', $user->id)
+                ->exists();
+        }
         
         return response()->json([
             'success' => true,
@@ -196,9 +215,47 @@ class InspirationController extends Controller
         $user = auth()->user();
         $inspirations = $user->savedInspirations()->paginate(15);
 
+        // Add is_saved flag (all are saved since this is saved list)
+        $inspirations->getCollection()->transform(function ($inspiration) {
+            $inspiration->is_saved = true;
+            return $inspiration;
+        });
+
         return response()->json([
             'success' => true,
             'data' => $inspirations
+        ]);
+    }
+
+    /**
+     * Remove inspiration from saved list (unfavorite)
+     */
+    public function removeSaved(Request $request, $id)
+    {
+        $inspiration = Inspiration::findOrFail($id);
+        $user = auth()->user();
+
+        // Check if user has saved this
+        $isSaved = $inspiration->savedByUsers()->where('user_id', $user->id)->exists();
+
+        if (!$isSaved) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Inspiration is not in your saved list'
+            ], 400);
+        }
+
+        // Remove from saved
+        $inspiration->savedByUsers()->detach($user->id);
+        $inspiration->decrement('liked_count');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Inspiration removed from your saved list',
+            'data' => [
+                'is_saved' => false,
+                'liked_count' => $inspiration->liked_count
+            ]
         ]);
     }
 }

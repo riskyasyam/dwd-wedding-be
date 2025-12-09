@@ -31,9 +31,14 @@ class DecorationController extends Controller
             $query->where('name', 'like', '%' . $request->search . '%');
         }
 
-        
-
         $decorations = $query->orderBy('created_at', 'desc')->paginate(15);
+
+        // Calculate rating and review count from customer reviews
+        $decorations->getCollection()->transform(function ($decoration) {
+            $decoration->rating = round($decoration->reviews()->avg('rating') ?? 0, 1);
+            $decoration->review_count = $decoration->reviews()->count();
+            return $decoration;
+        });
 
         return response()->json([
             'success' => true,
@@ -93,6 +98,10 @@ class DecorationController extends Controller
         } else {
             $decoration = Decoration::with('images', 'freeItems', 'advantages', 'terms', 'faqs')->where('slug', $identifier)->firstOrFail();
         }
+
+        // Calculate rating and review count from customer reviews
+        $decoration->rating = round($decoration->reviews()->avg('rating') ?? 0, 1);
+        $decoration->review_count = $decoration->reviews()->count();
 
         return response()->json([
             'success' => true,

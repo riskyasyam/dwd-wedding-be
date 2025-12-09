@@ -38,6 +38,17 @@ class OrderController extends Controller
         
         $orders = $query->orderBy('created_at', 'desc')->paginate(10);
         
+        // Add has_reviewed flag for each order item
+        $orders->getCollection()->transform(function ($order) use ($user) {
+            $order->items->each(function ($item) use ($user) {
+                $hasReviewed = \App\Models\Review::where('user_id', $user->id)
+                    ->where('decoration_id', $item->decoration_id)
+                    ->exists();
+                $item->has_reviewed = $hasReviewed;
+            });
+            return $order;
+        });
+        
         return response()->json([
             'success' => true,
             'data' => $orders
@@ -54,6 +65,14 @@ class OrderController extends Controller
         $order = Order::where('user_id', $user->id)
             ->with(['items.decoration.images', 'user'])
             ->findOrFail($id);
+        
+        // Add has_reviewed flag for each order item
+        $order->items->each(function ($item) use ($user) {
+            $hasReviewed = \App\Models\Review::where('user_id', $user->id)
+                ->where('decoration_id', $item->decoration_id)
+                ->exists();
+            $item->has_reviewed = $hasReviewed;
+        });
         
         return response()->json([
             'success' => true,
@@ -165,14 +184,18 @@ class OrderController extends Controller
                 }
                 
                 // Calculate voucher discount
-                if ($voucher->discount_type === 'percentage') {
+                if ($voucher->type === 'percentage') {
                     $voucherDiscount = ($subtotal * $voucher->discount_value / 100);
                     if ($voucher->max_discount && $voucherDiscount > $voucher->max_discount) {
                         $voucherDiscount = $voucher->max_discount;
                     }
                 } else {
+                    // Fixed amount discount
                     $voucherDiscount = $voucher->discount_value;
                 }
+                
+                // Ensure voucher discount is numeric and properly calculated
+                $voucherDiscount = (float) $voucherDiscount;
                 
                 $voucherCode = $voucher->code;
             }
@@ -211,11 +234,25 @@ class OrderController extends Controller
 
         // Create order items from cart items
         foreach ($cart->items as $cartItem) {
+            $decoration = $cartItem->decoration;
+            
+            // Calculate base_price and discount per item
+            $basePrice = $decoration->base_price;
+            $discountAmount = 0;
+            
+            if ($decoration->discount_percent > 0) {
+                $discountAmount = $basePrice * $decoration->discount_percent / 100;
+            }
+            
+            $finalPrice = $basePrice - $discountAmount;
+            
             $order->items()->create([
                 'decoration_id' => $cartItem->decoration_id,
                 'type' => $cartItem->type,
                 'quantity' => $cartItem->quantity,
-                'price' => $cartItem->price,
+                'base_price' => $basePrice,
+                'discount' => $discountAmount,
+                'price' => $finalPrice,
             ]);
         }
 
@@ -247,9 +284,19 @@ class OrderController extends Controller
             // Cart items already use final_price (base_price - decoration_discount)
             
             if ($voucherDiscount > 0) {
+                // Ensure the discount is a proper negative integer for Midtrans
+                $discountPrice = -1 * (int) round($voucherDiscount);
+                
+                \Log::info('Voucher Discount Debug', [
+                    'voucherDiscount' => $voucherDiscount,
+                    'discountPrice' => $discountPrice,
+                    'voucherCode' => $voucherCode,
+                    'subtotal' => $subtotal
+                ]);
+                
                 $params['item_details'][] = [
                     'id' => 'VOUCHER',
-                    'price' => -1 * (int) $voucherDiscount,
+                    'price' => $discountPrice,
                     'quantity' => 1,
                     'name' => 'Voucher Discount (' . $voucherCode . ')',
                 ];
@@ -375,5 +422,64 @@ class OrderController extends Controller
             'message' => 'Order cancelled successfully',
             'data' => $order
         ]);
+    }
+
+    /**
+     * Submit review for a decoration from completed order
+     */
+    public function submitReview(Request $request, $id)
+    {
+        $request->validate([
+            'decoration_id' => 'required|exists:decorations,id',
+            'rating' => 'required|integer|min:1|max:5',
+            'comment' => 'required|string|max:1000',
+        ]);
+
+        $user = auth()->user();
+        
+        // Verify order belongs to user and is completed
+        $order = Order::where('user_id', $user->id)
+            ->where('id', $id)
+            ->whereIn('status', ['completed', 'paid'])
+            ->firstOrFail();
+
+        // Verify decoration is in the order
+        $orderItem = $order->items()
+            ->where('decoration_id', $request->decoration_id)
+            ->first();
+
+        if (!$orderItem) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Decoration not found in this order'
+            ], 404);
+        }
+
+        // Check if already reviewed
+        $existingReview = \App\Models\Review::where('user_id', $user->id)
+            ->where('decoration_id', $request->decoration_id)
+            ->first();
+
+        if ($existingReview) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You have already reviewed this decoration'
+            ], 400);
+        }
+
+        // Create review
+        $review = \App\Models\Review::create([
+            'user_id' => $user->id,
+            'decoration_id' => $request->decoration_id,
+            'rating' => $request->rating,
+            'comment' => $request->comment,
+            'posted_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Review submitted successfully',
+            'data' => $review
+        ], 201);
     }
 }

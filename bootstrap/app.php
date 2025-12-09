@@ -17,6 +17,11 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Session\Middleware\StartSession::class,
         ]);
         
+        // Add token expiration check to API routes
+        $middleware->api(prepend: [
+            \App\Http\Middleware\CheckTokenExpiration::class,
+        ]);
+        
         $middleware->alias([
             'role' => \App\Http\Middleware\CheckRole::class,
         ]);

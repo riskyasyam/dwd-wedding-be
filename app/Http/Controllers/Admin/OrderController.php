@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use Illuminate\Http\Request;
+use App\Exports\OrdersExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class OrderController extends Controller
 {
@@ -207,5 +209,41 @@ class OrderController extends Controller
                 'completed_orders' => $completedOrders,
             ]
         ]);
+    }
+
+    /**
+     * Export orders to Excel
+     * Supports all filters: status, search, date range
+     */
+    public function export(Request $request)
+    {
+        // Prepare filters from request
+        $filters = [];
+        
+        if ($request->has('status')) {
+            $filters['status'] = $request->status;
+        }
+        
+        if ($request->has('search')) {
+            $filters['search'] = $request->search;
+        }
+        
+        if ($request->has('start_date')) {
+            $filters['start_date'] = $request->start_date;
+        }
+        
+        if ($request->has('end_date')) {
+            $filters['end_date'] = $request->end_date;
+        }
+        
+        if ($request->has('user_id')) {
+            $filters['user_id'] = $request->user_id;
+        }
+
+        // Generate filename with current date
+        $filename = 'Orders_Report_' . now()->format('Y-m-d_His') . '.xlsx';
+
+        // Export to Excel
+        return Excel::download(new OrdersExport($filters), $filename);
     }
 }

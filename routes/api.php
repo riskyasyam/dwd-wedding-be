@@ -175,6 +175,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('reviews/{id}', [\App\Http\Controllers\Admin\ReviewController::class, 'destroy']);
         
         // Orders Management
+        Route::get('orders/export', [\App\Http\Controllers\Admin\OrderController::class, 'export']); // Export to Excel
         Route::get('orders/statistics', [\App\Http\Controllers\Admin\OrderController::class, 'statistics']);
         Route::get('orders/recent/{limit?}', [\App\Http\Controllers\Admin\OrderController::class, 'recent']);
         Route::get('orders', [\App\Http\Controllers\Admin\OrderController::class, 'index']);

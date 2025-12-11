@@ -39,13 +39,15 @@ class InspirationController extends Controller
 
         $inspirations = $query->paginate(15);
 
-        // Add is_saved flag if user is authenticated
+        // Add is_saved flag if user is authenticated (optimized to prevent N+1)
         if (auth()->check()) {
             $user = auth()->user();
-            $inspirations->getCollection()->transform(function ($inspiration) use ($user) {
-                $inspiration->is_saved = $inspiration->savedByUsers()
-                    ->where('user_id', $user->id)
-                    ->exists();
+            
+            // Get all saved inspiration IDs for current user in one query
+            $savedIds = $user->savedInspirations()->pluck('inspirations.id')->toArray();
+            
+            $inspirations->getCollection()->transform(function ($inspiration) use ($savedIds) {
+                $inspiration->is_saved = in_array($inspiration->id, $savedIds);
                 return $inspiration;
             });
         }

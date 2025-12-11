@@ -9,7 +9,8 @@ Route::get('/health', function () {
 });
 
 // Public routes (no authentication required) - for landing page
-Route::prefix('public')->group(function () {
+// Cache enabled: 10 minutes for faster loading
+Route::prefix('public')->middleware('cache.api:10')->group(function () {
     // Decorations - public browsing
     Route::get('/decorations', [\App\Http\Controllers\Admin\DecorationController::class, 'index']);
     Route::get('/decorations/{id}', [\App\Http\Controllers\Admin\DecorationController::class, 'show']);

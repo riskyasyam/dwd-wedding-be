@@ -14,7 +14,10 @@ class VendorController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Vendor::with('images');
+        // Optimize: Load only first image for list view
+        $query = Vendor::with(['images' => function($query) {
+            $query->limit(1);
+        }]);
 
         // Filter by category
         if ($request->has('category')) {

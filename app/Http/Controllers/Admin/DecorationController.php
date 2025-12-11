@@ -14,7 +14,13 @@ class DecorationController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Decoration::with('images', 'freeItems', 'advantages', 'terms', 'faqs');
+        // Optimize with eager loading and aggregates to prevent N+1 queries
+        $query = Decoration::with(['images' => function($query) {
+                // Only load first image for list view (optimization)
+                $query->limit(1);
+            }])
+            ->withAvg('reviews', 'rating')
+            ->withCount('reviews');
 
         // Filter by region
         if ($request->has('region')) {
@@ -33,10 +39,15 @@ class DecorationController extends Controller
 
         $decorations = $query->orderBy('created_at', 'desc')->paginate(15);
 
-        // Calculate rating and review count from customer reviews
+        // Format aggregated data
         $decorations->getCollection()->transform(function ($decoration) {
-            $decoration->rating = round($decoration->reviews()->avg('rating') ?? 0, 1);
-            $decoration->review_count = $decoration->reviews()->count();
+            $decoration->rating = round($decoration->reviews_avg_rating ?? 0, 1);
+            $decoration->review_count = $decoration->reviews_count ?? 0;
+            
+            // Remove aggregate attributes to clean response
+            unset($decoration->reviews_avg_rating);
+            unset($decoration->reviews_count);
+            
             return $decoration;
         });
 
@@ -92,16 +103,25 @@ class DecorationController extends Controller
      */
     public function show($identifier)
     {
+        // Optimize with eager loading and aggregates
+        $query = Decoration::with('images', 'freeItems', 'advantages', 'terms', 'faqs')
+            ->withAvg('reviews', 'rating')
+            ->withCount('reviews');
+
         // Try to find by ID first, if not numeric then find by slug
         if (is_numeric($identifier)) {
-            $decoration = Decoration::with('images', 'freeItems', 'advantages', 'terms', 'faqs')->findOrFail($identifier);
+            $decoration = $query->findOrFail($identifier);
         } else {
-            $decoration = Decoration::with('images', 'freeItems', 'advantages', 'terms', 'faqs')->where('slug', $identifier)->firstOrFail();
+            $decoration = $query->where('slug', $identifier)->firstOrFail();
         }
 
-        // Calculate rating and review count from customer reviews
-        $decoration->rating = round($decoration->reviews()->avg('rating') ?? 0, 1);
-        $decoration->review_count = $decoration->reviews()->count();
+        // Format aggregated data
+        $decoration->rating = round($decoration->reviews_avg_rating ?? 0, 1);
+        $decoration->review_count = $decoration->reviews_count ?? 0;
+        
+        // Remove aggregate attributes
+        unset($decoration->reviews_avg_rating);
+        unset($decoration->reviews_count);
 
         return response()->json([
             'success' => true,

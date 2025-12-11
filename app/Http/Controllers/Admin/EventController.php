@@ -14,7 +14,10 @@ class EventController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Event::with('images');
+        // Optimize: Load only first image for list view
+        $query = Event::with(['images' => function($query) {
+            $query->limit(1);
+        }]);
 
         // Search by title
         if ($request->has('search')) {

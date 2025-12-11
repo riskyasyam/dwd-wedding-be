@@ -65,7 +65,7 @@ class InspirationController extends Controller
     {
         $request->validate([
             'title' => 'required|string|max:255',
-            'image' => 'required|image|mimes:jpeg,png,jpg,webp|max:2048',
+            'image' => 'required|image|mimes:jpeg,png,jpg,webp|max:10240', // Max 10MB
             'colors' => 'required|array|min:1', // Array of colors
             'colors.*' => 'string|max:255', // Each color is a string
             'location' => 'required|string|max:255',
@@ -121,7 +121,7 @@ class InspirationController extends Controller
 
         $request->validate([
             'title' => 'sometimes|required|string|max:255',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:10240', // Max 10MB
             'colors' => 'sometimes|required|array|min:1',
             'colors.*' => 'string|max:255',
             'location' => 'sometimes|required|string|max:255',

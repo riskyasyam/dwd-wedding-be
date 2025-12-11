@@ -15,10 +15,13 @@ class DecorationController extends Controller
     public function index(Request $request)
     {
         // Optimize with eager loading and aggregates to prevent N+1 queries
-        $query = Decoration::with(['images' => function($query) {
-                // Only load first image for list view (optimization)
-                $query->limit(1);
-            }])
+        $query = Decoration::with([
+                'images' => function($query) {
+                    // Only load first image for list view (optimization)
+                    $query->limit(1);
+                },
+                'freeItems' // Load free items for frontend display
+            ])
             ->withAvg('reviews', 'rating')
             ->withCount('reviews');
 
@@ -37,16 +40,22 @@ class DecorationController extends Controller
             $query->where('name', 'like', '%' . $request->search . '%');
         }
 
-        $decorations = $query->orderBy('created_at', 'desc')->paginate(15);
+        // Dynamic pagination (default 15, max 100)
+        $perPage = min($request->input('per_page', 15), 100);
+        $decorations = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
         // Format aggregated data
         $decorations->getCollection()->transform(function ($decoration) {
             $decoration->rating = round($decoration->reviews_avg_rating ?? 0, 1);
             $decoration->review_count = $decoration->reviews_count ?? 0;
             
+            // Convert freeItems to free_items for frontend compatibility
+            $decoration->free_items = $decoration->freeItems;
+            
             // Remove aggregate attributes to clean response
             unset($decoration->reviews_avg_rating);
             unset($decoration->reviews_count);
+            unset($decoration->freeItems);
             
             return $decoration;
         });
@@ -193,7 +202,7 @@ class DecorationController extends Controller
 
         $request->validate([
             'images' => 'required|array',
-            'images.*' => 'image|mimes:jpeg,png,jpg,webp|max:2048'
+            'images.*' => 'image|mimes:jpeg,png,jpg,webp|max:10240' // Max 10MB per image
         ]);
 
         $uploadedImages = [];

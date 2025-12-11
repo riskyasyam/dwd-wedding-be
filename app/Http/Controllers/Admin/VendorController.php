@@ -146,7 +146,7 @@ class VendorController extends Controller
 
         $request->validate([
             'images' => 'required|array',
-            'images.*' => 'image|mimes:jpeg,png,jpg,webp|max:2048'
+            'images.*' => 'image|mimes:jpeg,png,jpg,webp|max:10240' // Max 10MB per image
         ]);
 
         $uploadedImages = [];

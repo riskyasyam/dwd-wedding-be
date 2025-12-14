@@ -26,6 +26,15 @@ class Order extends Model
         'total',
         'status',
         'payment_method',
+        'payment_type',
+        'dp_amount',
+        'remaining_amount',
+        'dp_paid_at',
+        'full_paid_at',
+        'remaining_paid_at',
+        'snap_token',
+        'dp_snap_token',
+        'remaining_snap_token',
         'notes',
     ];
 
@@ -35,6 +44,11 @@ class Order extends Model
         'discount' => 'integer',
         'delivery_fee' => 'integer',
         'total' => 'integer',
+        'dp_amount' => 'integer',
+        'remaining_amount' => 'integer',
+        'dp_paid_at' => 'datetime',
+        'full_paid_at' => 'datetime',
+        'remaining_paid_at' => 'datetime',
     ];
 
     /**

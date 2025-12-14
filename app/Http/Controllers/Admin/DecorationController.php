@@ -80,6 +80,7 @@ class DecorationController extends Controller
             'discount_start_date' => 'nullable|date',
             'discount_end_date' => 'nullable|date|after_or_equal:discount_start_date',
             'is_deals' => 'boolean',
+            'minimum_dp_percentage' => 'nullable|integer|min:10|max:100',
             'advantages' => 'nullable|array',
             'terms' => 'nullable|array',
         ]);
@@ -98,6 +99,7 @@ class DecorationController extends Controller
             'discount_start_date' => $request->discount_start_date,
             'discount_end_date' => $request->discount_end_date,
             'is_deals' => $request->boolean('is_deals', false),
+            'minimum_dp_percentage' => $request->input('minimum_dp_percentage', 30),
         ]);
 
         return response()->json([
@@ -154,6 +156,7 @@ class DecorationController extends Controller
             'discount_start_date' => 'nullable|date',
             'discount_end_date' => 'nullable|date|after_or_equal:discount_start_date',
             'is_deals' => 'boolean',
+            'minimum_dp_percentage' => 'nullable|integer|min:10|max:100',
         ]);
 
         $discountPercent = $request->discount_percent ?? 0;
@@ -170,6 +173,7 @@ class DecorationController extends Controller
             'discount_start_date' => $request->discount_start_date,
             'discount_end_date' => $request->discount_end_date,
             'is_deals' => $request->boolean('is_deals', false),
+            'minimum_dp_percentage' => $request->input('minimum_dp_percentage', 30),
         ]);
 
         return response()->json([

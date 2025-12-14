@@ -19,6 +19,7 @@ class Decoration extends Model
         'rating',
         'review_count',
         'is_deals',
+        'minimum_dp_percentage',
     ];
 
     protected $casts = [
@@ -28,6 +29,7 @@ class Decoration extends Model
         'rating' => 'decimal:1',
         'review_count' => 'integer',
         'is_deals' => 'boolean',
+        'minimum_dp_percentage' => 'integer',
         'discount_start_date' => 'date',
         'discount_end_date' => 'date',
     ];

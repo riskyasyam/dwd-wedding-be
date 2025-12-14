@@ -68,7 +68,7 @@ class OrderController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $request->validate([
-            'status' => 'required|in:pending,paid,failed,completed,cancelled',
+            'status' => 'required|in:pending,dp_paid,paid,processing,failed,completed,cancelled',
         ]);
 
         $order = Order::findOrFail($id);
@@ -89,13 +89,18 @@ class OrderController extends Controller
     {
         $totalOrders = Order::count();
         $pendingOrders = Order::where('status', 'pending')->count();
+        $dpPaidOrders = Order::where('status', 'dp_paid')->count();
         $paidOrders = Order::where('status', 'paid')->count();
+        $processingOrders = Order::where('status', 'processing')->count();
         $completedOrders = Order::where('status', 'completed')->count();
         $failedOrders = Order::where('status', 'failed')->count();
         $cancelledOrders = Order::where('status', 'cancelled')->count();
 
         // Total revenue (only paid and completed orders)
         $totalRevenue = Order::whereIn('status', ['paid', 'completed'])->sum('total');
+        
+        // DP revenue (only DP amount from dp_paid orders)
+        $dpRevenue = Order::where('status', 'dp_paid')->sum('dp_amount');
 
         // Orders this month
         $ordersThisMonth = Order::whereYear('created_at', date('Y'))
@@ -113,11 +118,14 @@ class OrderController extends Controller
             'data' => [
                 'total_orders' => $totalOrders,
                 'pending_orders' => $pendingOrders,
+                'dp_paid_orders' => $dpPaidOrders,
                 'paid_orders' => $paidOrders,
+                'processing_orders' => $processingOrders,
                 'completed_orders' => $completedOrders,
                 'failed_orders' => $failedOrders,
                 'cancelled_orders' => $cancelledOrders,
                 'total_revenue' => $totalRevenue,
+                'dp_revenue' => $dpRevenue,
                 'orders_this_month' => $ordersThisMonth,
                 'revenue_this_month' => $revenueThisMonth,
             ]

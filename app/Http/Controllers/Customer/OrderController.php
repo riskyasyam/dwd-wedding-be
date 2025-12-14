@@ -99,6 +99,9 @@ class OrderController extends Controller
             'sub_district' => 'required|string|max:255',
             'postal_code' => 'required|string|max:10',
             
+            // Payment Type
+            'payment_type' => 'required|in:full,dp',
+            
             // Notes (optional)
             'notes' => 'nullable|string',
             
@@ -206,6 +209,22 @@ class OrderController extends Controller
         // So we only subtract voucher discount, NOT decoration discount
         $total = $subtotal - $voucherDiscount + $deliveryFee;
 
+        // Calculate DP if payment type is DP
+        $paymentType = $request->payment_type;
+        $dpAmount = 0;
+        $remainingAmount = 0;
+        
+        if ($paymentType === 'dp') {
+            // Get minimum DP percentage from all decorations in cart
+            $minDpPercentage = $cart->items->max(function ($item) {
+                return $item->decoration->minimum_dp_percentage ?? 30;
+            });
+            
+            // Calculate DP amount (minimum percentage of total)
+            $dpAmount = ceil($total * $minDpPercentage / 100);
+            $remainingAmount = $total - $dpAmount;
+        }
+
         // Generate unique order number
         $orderNumber = 'ORD-' . time() . '-' . strtoupper(substr(md5($user->id), 0, 6));
 
@@ -228,6 +247,9 @@ class OrderController extends Controller
             'discount' => $decorationDiscount,
             'delivery_fee' => $deliveryFee,
             'total' => $total,
+            'payment_type' => $paymentType,
+            'dp_amount' => $dpAmount,
+            'remaining_amount' => $remainingAmount,
             'status' => 'pending',
             'notes' => $request->notes,
         ]);
@@ -258,10 +280,13 @@ class OrderController extends Controller
 
         // Create Midtrans transaction
         try {
+            // Use DP amount if payment type is DP, otherwise use full amount
+            $paymentAmount = ($paymentType === 'dp') ? $dpAmount : $total;
+            
             $params = [
                 'transaction_details' => [
                     'order_id' => $orderNumber,
-                    'gross_amount' => (int) $total,
+                    'gross_amount' => (int) $paymentAmount,
                 ],
                 'customer_details' => [
                     'first_name' => $user->first_name,
@@ -269,49 +294,71 @@ class OrderController extends Controller
                     'email' => $user->email,
                     'phone' => $user->phone ?? '',
                 ],
-                'item_details' => $cart->items->map(function ($item) {
+            ];
+
+            // For DP payment, use single item with DP amount
+            // For Full payment, use detailed items
+            if ($paymentType === 'dp') {
+                $params['item_details'] = [
+                    [
+                        'id' => $orderNumber,
+                        'price' => (int) $dpAmount,
+                        'quantity' => 1,
+                        'name' => "Down Payment (DP) - Order #{$orderNumber}",
+                    ]
+                ];
+            } else {
+                // Full payment - show detailed items
+                $params['item_details'] = $cart->items->map(function ($item) {
                     return [
                         'id' => $item->decoration_id,
                         'price' => (int) $item->price,
                         'quantity' => $item->quantity,
                         'name' => $item->decoration->name,
                     ];
-                })->toArray(),
-            ];
-
-            // Add discount items if any
-            // DON'T add decoration discount here - it's already included in item prices!
-            // Cart items already use final_price (base_price - decoration_discount)
-            
-            if ($voucherDiscount > 0) {
-                // Ensure the discount is a proper negative integer for Midtrans
-                $discountPrice = -1 * (int) round($voucherDiscount);
+                })->toArray();
                 
-                \Log::info('Voucher Discount Debug', [
-                    'voucherDiscount' => $voucherDiscount,
-                    'discountPrice' => $discountPrice,
-                    'voucherCode' => $voucherCode,
-                    'subtotal' => $subtotal
-                ]);
+                // Add discount items if any
+                // DON'T add decoration discount here - it's already included in item prices!
+                // Cart items already use final_price (base_price - decoration_discount)
                 
-                $params['item_details'][] = [
-                    'id' => 'VOUCHER',
-                    'price' => $discountPrice,
-                    'quantity' => 1,
-                    'name' => 'Voucher Discount (' . $voucherCode . ')',
-                ];
-            }
+                if ($voucherDiscount > 0) {
+                    // Ensure the discount is a proper negative integer for Midtrans
+                    $discountPrice = -1 * (int) round($voucherDiscount);
+                    
+                    \Log::info('Voucher Discount Debug', [
+                        'voucherDiscount' => $voucherDiscount,
+                        'discountPrice' => $discountPrice,
+                        'voucherCode' => $voucherCode,
+                        'subtotal' => $subtotal
+                    ]);
+                    
+                    $params['item_details'][] = [
+                        'id' => 'VOUCHER',
+                        'price' => $discountPrice,
+                        'quantity' => 1,
+                        'name' => 'Voucher Discount (' . $voucherCode . ')',
+                    ];
+                }
 
-            if ($deliveryFee > 0) {
-                $params['item_details'][] = [
-                    'id' => 'DELIVERY',
-                    'price' => (int) $deliveryFee,
-                    'quantity' => 1,
-                    'name' => 'Delivery Fee',
-                ];
+                if ($deliveryFee > 0) {
+                    $params['item_details'][] = [
+                        'id' => 'DELIVERY',
+                        'price' => (int) $deliveryFee,
+                        'quantity' => 1,
+                        'name' => 'Delivery Fee',
+                    ];
+                }
             }
 
             $snapToken = Snap::getSnapToken($params);
+
+            // Save snap token based on payment type
+            if ($paymentType === 'dp') {
+                $order->update(['dp_snap_token' => $snapToken]);
+            } else {
+                $order->update(['snap_token' => $snapToken]);
+            }
 
             // Update voucher usage if used
             if ($voucherCode) {
@@ -353,11 +400,23 @@ class OrderController extends Controller
     public function checkPaymentStatus($orderNumber)
     {
         try {
+            // Check if this is a remaining payment by checking order ID suffix
+            $isRemainingPayment = str_contains($orderNumber, '-REMAINING');
+            
+            // Extract actual order number (remove -REMAINING and timestamp)
+            if ($isRemainingPayment) {
+                // Pattern: ORD-XXX-REMAINING-timestamp
+                $parts = explode('-REMAINING', $orderNumber);
+                $actualOrderNumber = $parts[0];
+            } else {
+                $actualOrderNumber = $orderNumber;
+            }
+
             // Get transaction status from Midtrans
             $status = Transaction::status($orderNumber);
 
             // Find order
-            $order = Order::where('order_number', $orderNumber)->firstOrFail();
+            $order = Order::where('order_number', $actualOrderNumber)->firstOrFail();
 
             // Update order status based on Midtrans response
             $transactionStatus = $status->transaction_status;
@@ -365,33 +424,64 @@ class OrderController extends Controller
 
             if ($transactionStatus == 'capture') {
                 if ($fraudStatus == 'accept') {
-                    $order->status = 'paid';
-                    $order->payment_method = $status->payment_type;
+                    $this->updateOrderStatus($order, $isRemainingPayment, $status->payment_type, 'manual_check');
                 }
             } else if ($transactionStatus == 'settlement') {
-                $order->status = 'paid';
-                $order->payment_method = $status->payment_type;
+                $this->updateOrderStatus($order, $isRemainingPayment, $status->payment_type, 'manual_check');
             } else if ($transactionStatus == 'pending') {
-                $order->status = 'pending';
+                \Log::info('Payment still pending', [
+                    'order_number' => $order->order_number,
+                    'is_remaining' => $isRemainingPayment
+                ]);
             } else if (in_array($transactionStatus, ['deny', 'expire', 'cancel'])) {
-                $order->status = 'failed';
+                // Only update to failed if order is still pending or dp_paid
+                if (in_array($order->status, ['pending', 'dp_paid'])) {
+                    $order->status = 'failed';
+                    $order->save();
+                    
+                    \Log::warning('Payment failed/cancelled', [
+                        'order_number' => $order->order_number,
+                        'midtrans_order_id' => $orderNumber,
+                        'transaction_status' => $transactionStatus,
+                        'is_remaining' => $isRemainingPayment
+                    ]);
+                }
             }
-
-            $order->save();
 
             return response()->json([
                 'success' => true,
                 'data' => [
                     'order_number' => $orderNumber,
+                    'actual_order_number' => $actualOrderNumber,
+                    'is_remaining_payment' => $isRemainingPayment,
                     'order_status' => $order->status,
                     'transaction_status' => $transactionStatus,
                     'payment_type' => $status->payment_type,
                     'transaction_time' => $status->transaction_time,
                     'gross_amount' => $status->gross_amount,
+                    'order' => [
+                        'id' => $order->id,
+                        'order_number' => $order->order_number,
+                        'status' => $order->status,
+                        'payment_type' => $order->payment_type,
+                        'total' => $order->total,
+                        'dp_amount' => $order->dp_amount,
+                        'remaining_amount' => $order->remaining_amount,
+                        'dp_paid_at' => $order->dp_paid_at,
+                        'remaining_paid_at' => $order->remaining_paid_at,
+                        'full_paid_at' => $order->full_paid_at,
+                    ]
                 ]
             ]);
 
         } catch (\Exception $e) {
+            \Log::error('Error checking payment status', [
+                'order_number' => $orderNumber,
+                'is_remaining' => isset($isRemainingPayment) ? $isRemainingPayment : false,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to check payment status: ' . $e->getMessage()
@@ -481,5 +571,153 @@ class OrderController extends Controller
             'message' => 'Review submitted successfully',
             'data' => $review
         ], 201);
+    }
+    /**
+     * Pay remaining amount after DP payment
+     */
+    public function payRemaining($id)
+    {
+        $user = auth()->user();
+        
+        $order = Order::where('user_id', $user->id)->findOrFail($id);
+        
+        // Validate order can pay remaining
+        if ($order->payment_type !== 'dp') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order is not a DP payment'
+            ], 400);
+        }
+        
+        if ($order->status !== 'dp_paid') {
+            return response()->json([
+                'success' => false,
+                'message' => 'DP has not been paid yet'
+            ], 400);
+        }
+        
+        if ($order->remaining_amount <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No remaining amount to pay'
+            ], 400);
+        }
+        
+        // Create Midtrans transaction for remaining payment
+        try {
+            // Add timestamp to make order_id unique for each attempt
+            $timestamp = time();
+            $remainingOrderNumber = $order->order_number . '-REMAINING-' . $timestamp;
+            
+            $params = [
+                'transaction_details' => [
+                    'order_id' => $remainingOrderNumber,
+                    'gross_amount' => (int) $order->remaining_amount,
+                ],
+                'customer_details' => [
+                    'first_name' => $order->first_name,
+                    'last_name' => $order->last_name,
+                    'email' => $order->email,
+                    'phone' => $order->phone ?? '',
+                ],
+                'item_details' => [[
+                    'id' => 'REMAINING-' . $order->id,
+                    'price' => (int) $order->remaining_amount,
+                    'quantity' => 1,
+                    'name' => 'Remaining Payment - ' . $order->order_number,
+                ]],
+            ];
+            
+            $snapToken = \Midtrans\Snap::getSnapToken($params);
+            
+            // Update order with remaining snap token
+            $order->update([
+                'remaining_snap_token' => $snapToken,
+            ]);
+            
+            \Log::info('Remaining payment snap token created', [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'remaining_order_number' => $remainingOrderNumber,
+                'remaining_amount' => $order->remaining_amount,
+            ]);
+            
+            return response()->json([
+                'success' => true,
+                'snap_token' => $snapToken,
+                'remaining_amount' => $order->remaining_amount,
+                'order' => $order
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::error('Midtrans Remaining Payment Error', [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create remaining payment: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Helper method to update order status based on payment type
+     * Used by manual polling (checkPaymentStatus)
+     * 
+     * @param Order $order
+     * @param bool $isRemainingPayment
+     * @param string $paymentType
+     * @param string $source
+     * @return void
+     */
+    private function updateOrderStatus($order, $isRemainingPayment, $paymentType, $source = 'manual_check')
+    {
+        if ($isRemainingPayment) {
+            // This is remaining payment - set to paid
+            $order->status = 'paid';
+            $order->remaining_paid_at = now();
+            $order->full_paid_at = now();
+            $order->remaining_amount = 0;
+            $order->payment_method = $paymentType;
+            
+            \Log::info('Remaining payment settled via ' . $source, [
+                'order_number' => $order->order_number,
+                'status' => 'paid',
+                'remaining_amount' => 0,
+                'remaining_paid_at' => now()->toDateTimeString(),
+                'full_paid_at' => now()->toDateTimeString()
+            ]);
+        } else if ($order->payment_type === 'dp' && $order->remaining_amount > 0) {
+            // This is DP payment - set to dp_paid
+            $order->status = 'dp_paid';
+            $order->dp_paid_at = now();
+            $order->payment_method = $paymentType;
+            
+            \Log::info('DP payment settled via ' . $source, [
+                'order_number' => $order->order_number,
+                'status' => 'dp_paid',
+                'dp_amount' => $order->dp_amount,
+                'remaining_amount' => $order->remaining_amount,
+                'dp_paid_at' => now()->toDateTimeString()
+            ]);
+        } else {
+            // This is full payment
+            $order->status = 'paid';
+            $order->full_paid_at = now();
+            $order->payment_method = $paymentType;
+            
+            \Log::info('Full payment settled via ' . $source, [
+                'order_number' => $order->order_number,
+                'status' => 'paid',
+                'total' => $order->total,
+                'full_paid_at' => now()->toDateTimeString()
+            ]);
+        }
+        
+        $order->save();
     }
 }

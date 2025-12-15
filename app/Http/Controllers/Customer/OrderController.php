@@ -422,11 +422,34 @@ class OrderController extends Controller
             $transactionStatus = $status->transaction_status;
             $fraudStatus = $status->fraud_status ?? null;
 
+            \Log::info('Checking payment status', [
+                'order_number' => $actualOrderNumber,
+                'midtrans_order_id' => $orderNumber,
+                'transaction_status' => $transactionStatus,
+                'fraud_status' => $fraudStatus,
+                'is_remaining' => $isRemainingPayment,
+                'current_order_status' => $order->status,
+                'payment_type' => $order->payment_type
+            ]);
+
             if ($transactionStatus == 'capture') {
                 if ($fraudStatus == 'accept') {
+                    \Log::info('Payment captured with fraud accept', [
+                        'order_number' => $actualOrderNumber,
+                        'is_remaining' => $isRemainingPayment
+                    ]);
                     $this->updateOrderStatus($order, $isRemainingPayment, $status->payment_type, 'manual_check');
+                } else {
+                    \Log::warning('Payment captured but fraud status not accept', [
+                        'order_number' => $actualOrderNumber,
+                        'fraud_status' => $fraudStatus
+                    ]);
                 }
             } else if ($transactionStatus == 'settlement') {
+                \Log::info('Payment settlement detected', [
+                    'order_number' => $actualOrderNumber,
+                    'is_remaining' => $isRemainingPayment
+                ]);
                 $this->updateOrderStatus($order, $isRemainingPayment, $status->payment_type, 'manual_check');
             } else if ($transactionStatus == 'pending') {
                 \Log::info('Payment still pending', [

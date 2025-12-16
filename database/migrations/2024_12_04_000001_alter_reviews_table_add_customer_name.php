@@ -12,11 +12,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('reviews', function (Blueprint $table) {
-            // Make user_id nullable
+            // Make user_id nullable (already nullable from create, but ensure it)
             $table->foreignId('user_id')->nullable()->change();
             
-            // Add customer_name field for fake reviews
-            $table->string('customer_name')->nullable()->after('user_id');
+            // Add customer_name field for fake reviews (only if not exists)
+            if (!Schema::hasColumn('reviews', 'customer_name')) {
+                $table->string('customer_name')->nullable()->after('user_id');
+            }
         });
     }
 
@@ -29,8 +31,10 @@ return new class extends Migration
             // Revert user_id to not nullable
             $table->foreignId('user_id')->nullable(false)->change();
             
-            // Drop customer_name
-            $table->dropColumn('customer_name');
+            // Drop customer_name only if it was added by this migration
+            if (Schema::hasColumn('reviews', 'customer_name')) {
+                $table->dropColumn('customer_name');
+            }
         });
     }
 };
